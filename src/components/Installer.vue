@@ -70,7 +70,6 @@ async function configureService() {
   }
 }
 
-// Progress Logic
 function nextStep() {
   currentStep.value++
   progress.value = (currentStep.value / 4) * 100
@@ -79,7 +78,6 @@ function nextStep() {
 
 <template>
   <div class="w-11/12 mx-auto p-6 h-screen flex items-center justify-center">
-    <!-- Installation Card Container -->
     <Card class="">
       <template #title>QWM Installationsassistent</template>
 
@@ -87,11 +85,9 @@ function nextStep() {
         <p>Willkommen beim Installationsassistenten für QWM! Folgen Sie den Schritten, um die Installation
           abzuschließen.</p>
 
-        <!-- Progress Display -->
         <ProgressBar :value="progress" class="mt-4" />
         <p class="mt-2">{{ progressMessage }}</p>
 
-        <!-- Step 1: Choose Installation Folder -->
         <div v-if="currentStep === 1" class="mt-4">
           <h3>Schritt 1: Installationsordner wählen</h3>
           <InputText v-model="installPath" placeholder="Installationspfad (z.B.: C:\interSalesAG\QWM)" class="w-full" />
@@ -100,31 +96,28 @@ function nextStep() {
           </div>
         </div>
 
-        <!-- Step 2: Copy QWM Folder -->
         <div v-if="currentStep === 2" class="mt-4">
-          <h3>Schritt 2: QWM-Ordner kopieren</h3>
+          <h3>Schritt 2: QWM Source kopieren</h3>
           <p>Die QWM-Dateien werden in den Installationsordner kopiert.</p>
           <Button label="QWM-Ordner kopieren" icon="pi pi-copy" class="mt-2" @click="copyQWMFolder" />
         </div>
 
-        <!-- Step 3: Install PostgreSQL -->
         <div v-if="currentStep === 3" class="mt-4">
           <h3>Schritt 3: PostgreSQL installieren</h3>
           <p>Klicken Sie hier, um PostgreSQL zu installieren und die QWM-Datenbank einzurichten.</p>
           <Button label="PostgreSQL installieren" icon="pi pi-database" class="mt-2" @click="installPostgres" />
         </div>
 
-        <!-- Step 4: Configure Service -->
         <div v-if="currentStep === 4" class="mt-4">
           <h3>Schritt 4: Dienst konfigurieren</h3>
-          <p>NSSM wird zur Konfiguration des Windows-Dienstes verwendet.</p>
+          <p>Klicken Sie hier, um den Windows-Dienstes zu konfigurieren.</p>
           <Button label="Dienst konfigurieren" icon="pi pi-cog" class="mt-2" @click="configureService" />
         </div>
 
-        <!-- Completion -->
         <div v-if="currentStep > 4" class="mt-4 text-green-500">
           <h3>Installation abgeschlossen!</h3>
           <p>Die Anwendung wurde erfolgreich installiert und konfiguriert!</p>
+          <p>Die Anwendung kann jetzt gestartet werden. QWM liegt im Ordner: {{ installPath }}</p>
         </div>
       </template>
     </Card>
