@@ -1,89 +1,102 @@
-#![cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
+use std::{
+    env,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
-use std::ffi::OsStr;
-use std::path::Path;
-use zip::read::ZipArchive;
-use std::fs::File;
-use std::io::{self, Error, ErrorKind};
-use tauri::api::{shell};
-use tauri::{CustomMenuItem, Manager, AppHandle, Menu, Submenu};
+static QWM_FOLDER: &str = "qwm_src";
+static POSTGRES_SCRIPT: &str = "migrations/init.sql";
+static NSSM_EXECUTABLE: &str = "nssm.exe";
 
-static SOURCE_ZIP_PATH: &str = "qwm.zip";
-
-#[tauri::command]
-fn backend_add(number: i32) -> i32 {
-   println!("Backend was called with an argument: {}", number);
-   number + 2
+fn get_installer_dir() -> Result<PathBuf, String> {
+    env::current_exe()
+        .map_err(|e| format!("Failed to locate current directory: {}", e))
+        .and_then(|path| {
+            path.parent()
+                .map(PathBuf::from)
+                .ok_or("Failed to resolve parent directory".into())
+        })
 }
 
 #[tauri::command]
-fn unzip_files(app_handle: AppHandle, installation_path: String) -> Result<String, String> {
-    
-    let path_resolver = app_handle.path_resolver();
-    
-    let zip_path = path_resolver
-        .resolve_resource(SOURCE_ZIP_PATH)
-        .expect("failed to resolve zip path");
-  
-    println!("File path is: {:?}", zip_path);
+fn copy_qwm_folder(target_path: String) -> Result<String, String> {
+    let base_dir = get_installer_dir()?;
+    let source_path = base_dir.join(QWM_FOLDER).join("QWM");
+    let target_dir = Path::new(&target_path);
 
-    let mut zip_content = file_extractor(zip_path.to_str().unwrap()).map_err(|e| e.to_string())?;
-    zip_content.extract(installation_path.clone()).map_err(|e| e.to_string())?;
-    
-    Ok(installation_path)
-}
-
-fn file_extractor(zip_filename: &str) -> Result<ZipArchive<File>, Error> {
-    let path = Path::new(zip_filename);
-    let file = match File::open(&path) {
-        Ok(file) => file,
-        Err(why) => return Err(why)
-    };
-
-    if path.extension() == Some(OsStr::new("zip")) {
-        let archive_contents = ZipArchive::new(file)?;
-        Ok(archive_contents)
-    } else {
-        Err(io::Error::new(ErrorKind::InvalidInput, "The file is not a ZIP archive"))
+    if !source_path.exists() {
+        return Err("QWM Ordner nicht gefunden, bitte in den selben Ordner packen wie den Installer!".into());
     }
+
+    fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+    copy_dir_all(&source_path, &target_dir).map_err(|e| e.to_string())?;
+
+    Ok("QWM folder copied successfully!".into())
+}
+
+fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            fs::create_dir_all(&dst_path)?;
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn install_postgres(installation_path: String) -> Result<String, String> {
+    let base_dir = get_installer_dir()?;
+    let postgres_installer = base_dir.join("qwm_src/postgres_installer.exe");
+
+    // Run the PostgreSQL installer silently
+    Command::new(postgres_installer)
+        .args(["--mode", "unattended"])
+        .spawn()
+        .map_err(|e| format!("Failed to run PostgreSQL installer: {}", e))?
+        .wait()
+        .map_err(|e| format!("PostgreSQL installation failed: {}", e))?;
+
+    let psql_path = "C:\\Program Files\\PostgreSQL\\bin\\psql.exe";
+    let init_script = base_dir.join(POSTGRES_SCRIPT);
+
+    Command::new(psql_path)
+        .args(["-U", "postgres", "-f", &init_script.to_string_lossy()])
+        .spawn()
+        .map_err(|e| format!("Failed to execute SQL script: {}", e))?
+        .wait()
+        .map_err(|e| format!("SQL script execution failed: {}", e))?;
+
+    Ok("PostgreSQL installed and database configured.".into())
+}
+
+#[tauri::command]
+fn configure_service(installation_path: String) -> Result<String, String> {
+    let base_dir = get_installer_dir()?;
+    let nssm_path = base_dir.join("qwm_src").join(NSSM_EXECUTABLE);
+
+    Command::new(nssm_path)
+        .spawn()
+        .map_err(|e| format!("Failed to start NSSM tool: {}", e))?
+        .wait()
+        .map_err(|e| format!("NSSM tool encountered an issue: {}", e))?;
+
+    Ok("Service configured successfully.".into())
 }
 
 fn main() {
-    let ctx = tauri::generate_context!();
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![backend_add])
-        .invoke_handler(tauri::generate_handler![unzip_files])
-        .menu(
-            tauri::Menu::os_default("QWM Installer").add_submenu(Submenu::new(
-                "Help",
-                Menu::with_items([CustomMenuItem::new(
-                    "Online Documentation",
-                    "Online Documentation",
-                )
-                .into()]),
-            )),
-        )
-        .on_menu_event(|event| {
-            let event_name = event.menu_item_id();
-            match event_name {
-                "Online Documentation" => {
-                    let url = "https://github.com/Uninen/tauri-vue-template".to_string();
-                    shell::open(&event.window().shell_scope(), url, None).unwrap();
-                }
-                _ => {}
-            }
-        })
-        .setup(|_app| {
-            #[cfg(debug_assertions)]
-            {
-                let main_window = _app.get_window("main").unwrap();
-                main_window.open_devtools();
-            }
-            Ok(())
-        })
-        .run(ctx)
-        .expect("error while running tauri application");
+        .invoke_handler(tauri::generate_handler![
+            copy_qwm_folder,
+            install_postgres,
+            configure_service
+        ])
+        .run(tauri::generate_context!())
+        .expect("Error while running Tauri application");
 }

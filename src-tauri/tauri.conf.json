@@ -21,7 +21,6 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "resources": ["resources/qwm.zip"],
       "externalBin": [],
       "copyright": "",
       "category": "DeveloperTool",
@@ -40,17 +39,17 @@
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
-        "timestampUrl": ""
+        "timestampUrl": "",
+        "webviewInstallMode": {
+          "type": "embedBootstrapper"
+        }
       }
     },
     "updater": {
       "active": false
     },
     "allowlist": {
-      "all": true,
-      "fs": {
-        "scope": ["$RESOURCE/*"]
-      }
+      "all": true
     },
     "windows": [
       {

@@ -4,8 +4,8 @@
   "version": "0.4.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm run move:target && cross-env RUST_BACKTRACE=1 concurrently -k \"tauri dev\" \"pnpm devtools\"",
-    "build": "pnpm run move:target && tauri build",
+    "dev": "cross-env RUST_BACKTRACE=1 concurrently -k \"tauri dev\" \"pnpm devtools\"",
+    "build": "tauri build",
     "vite:dev": "vite dev",
     "vite:build": "vite build",
     "test": "vitest",
